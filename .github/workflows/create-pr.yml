@@ -59,6 +59,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: update-${{ env.VERSION }}
+          base: main
           title: "chore: bump ${{ env.MATCH }}* dependencies to ${{ env.VERSION }}"
           body: |
             This PR updates all **${{ env.MATCH }}**-related dependencies in the following files (with lockfiles):
