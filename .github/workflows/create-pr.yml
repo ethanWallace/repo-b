@@ -47,18 +47,18 @@ jobs:
 
       - name: Commit changes
         run: |
-          git checkout -b update-${VERSION}
+          git checkout -b update-${MATCH}-${VERSION}
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
           git commit -m "chore: bump $MATCH* dependencies to version ${VERSION}"
-          git push origin update-${VERSION}
+          git push origin update-${MATCH}-${VERSION}
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: update-${{ env.VERSION }}
+          branch: update-${{ env.MATCH }}-${{ env.VERSION }}
           base: main
           title: "chore: bump ${{ env.MATCH }}* dependencies to ${{ env.VERSION }}"
           body: |
