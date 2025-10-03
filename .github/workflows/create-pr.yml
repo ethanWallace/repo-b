@@ -53,15 +53,3 @@ jobs:
           git add .
           git commit -m "chore: bump $MATCH* dependencies to version ${VERSION}"
           git push origin update-${MATCH}-${VERSION}
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: update-${{ env.MATCH }}-${{ env.VERSION }}
-          base: main
-          title: "chore: bump ${{ env.MATCH }}* dependencies to ${{ env.VERSION }}"
-          body: |
-            This PR updates all **${{ env.MATCH }}**-related dependencies in the following files (with lockfiles):
-
-            ${{ env.FILES }}
