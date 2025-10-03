@@ -1,0 +1,66 @@
+name: Update dependencies and create PR
+
+on:
+  repository_dispatch:
+    types: [package-version-update]
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract values from payload
+        run: |
+          echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_ENV
+          echo "MATCH=${{ github.event.client_payload.match }}" >> $GITHUB_ENV
+
+      - name: Load file paths config
+        run: |
+          FILES=$(jq -r '.files[]' .dependency-update.json)
+          echo "FILES<<EOF" >> $GITHUB_ENV
+          echo "$FILES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Update dependencies in package.json files
+        run: |
+          while IFS= read -r FILE; do
+            if [ -f "$FILE" ]; then
+              echo "Updating $FILE for matches containing '$MATCH' ..."
+              jq --arg v "$VERSION" --arg m "$MATCH" '
+                (.dependencies      // {} | with_entries(if (.key | contains($m)) then .value = $v else . end)) as $d
+                | (.devDependencies // {} | with_entries(if (.key | contains($m)) then .value = $v else . end)) as $dd
+                | (.peerDependencies // {} | with_entries(if (.key | contains($m)) then .value = $v else . end)) as $pd
+                | .dependencies = (.dependencies // {} | $d)
+                | .devDependencies = (.devDependencies // {} | $dd)
+                | .peerDependencies = (.peerDependencies // {} | $pd)
+              ' "$FILE" > tmp.json && mv tmp.json "$FILE"
+            fi
+          done <<< "$FILES"
+
+      - name: Check if changes exist
+        run: |
+          if git diff --quiet; then
+            echo "No matching dependencies updated. Skipping."
+            exit 0
+          fi
+
+      - name: Commit changes
+        run: |
+          git checkout -b update-${VERSION}
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "chore: bump $MATCH* dependencies to version ${VERSION}"
+          git push origin update-${VERSION}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: update-${{ env.VERSION }}
+          title: "chore: bump ${{ env.MATCH }}* dependencies to ${{ env.VERSION }}"
+          body: |
+            This PR updates all **${{ env.MATCH }}**-related dependencies in the following files (with lockfiles):
+
+            ${{ env.FILES }}
