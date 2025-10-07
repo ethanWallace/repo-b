@@ -1,90 +1,58 @@
-name: Update Dependencies from Repo A
+name: Update dependencies and create PR
 
 on:
   repository_dispatch:
-    types: [update-version]
+    types: [package-version-update]
 
 jobs:
-  update:
+  update-dependencies:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Read config file (list of package.json files)
-        id: config
+      - name: Extract values from payload
         run: |
-          FILES=$(jq -r '.files[]' update-config.json)
+          echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_ENV
+          echo "MATCH=${{ github.event.client_payload.match }}" >> $GITHUB_ENV
+
+      - name: Load file paths config
+        run: |
+          FILES=$(jq -r '.files[]' .dependency-update.json)
           echo "FILES<<EOF" >> $GITHUB_ENV
           echo "$FILES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Update dependencies in package.json files
         run: |
-          set -e
-          VERSION="${{ github.event.client_payload.version }}"
-          MATCH="${{ github.event.client_payload.match }}"
-          changed_files=()
-
           while IFS= read -r FILE; do
             if [ -f "$FILE" ]; then
-              echo "Checking $FILE for matches containing '$MATCH' ..."
-
-              # Backup original
-              cp "$FILE" "$FILE.bak"
-
-              # Run jq update
+              echo "Updating $FILE for matches containing '$MATCH' ..."
               jq --arg v "$VERSION" --arg m "$MATCH" '
-                if .dependencies and (.dependencies | to_entries | any(.key | contains($m))) then
-                  .dependencies |= with_entries(if (.key | contains($m)) then .value = $v else . end)
-                else . end
-                | if .devDependencies and (.devDependencies | to_entries | any(.key | contains($m))) then
-                  .devDependencies |= with_entries(if (.key | contains($m)) then .value = $v else . end)
-                else . end
-                | if .peerDependencies and (.peerDependencies | to_entries | any(.key | contains($m))) then
-                  .peerDependencies |= with_entries(if (.key | contains($m)) then .value = $v else . end)
-                else . end
+                (.dependencies      // {} | with_entries(if (.key | contains($m)) then .value = $v else . end)) as $d
+                | (.devDependencies // {} | with_entries(if (.key | contains($m)) then .value = $v else . end)) as $dd
+                | (.peerDependencies // {} | with_entries(if (.key | contains($m)) then .value = $v else . end)) as $pd
+                | .dependencies = (.dependencies // {} | $d)
+                | .devDependencies = (.devDependencies // {} | $dd)
+                | .peerDependencies = (.peerDependencies // {} | $pd)
               ' "$FILE" > tmp.json && mv tmp.json "$FILE"
-
-              # Check if file actually changed
-              if ! cmp -s "$FILE" "$FILE.bak"; then
-                echo "→ $FILE changed"
-                rm "$FILE.bak"
-                changed_files+=("$FILE")
-              else
-                echo "→ No changes in $FILE"
-                mv "$FILE.bak" "$FILE" # restore original to keep git clean
-              fi
             fi
           done <<< "$FILES"
 
-          # Run npm install only in folders where package.json changed
-          # for FILE in "${changed_files[@]}"; do
-          #  dir=$(dirname "$FILE")
-          #  echo "Running npm install in $dir ..."
-          #  (cd "$dir" && npm install --package-lock-only)
-          # done
-
-          # Stage changes
-          if [ ${#changed_files[@]} -gt 0 ]; then
-            git add "${changed_files[@]}" */package-lock.json
-          else
-            echo "No changes detected — exiting."
+      - name: Check if changes exist
+        run: |
+          if git diff --quiet; then
+            echo "No matching dependencies updated. Skipping."
             exit 0
           fi
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
-          branch: "update-deps/${{ github.event.client_payload.match }}-${{ github.event.client_payload.version }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
           base: main
-          commit-message: "chore: bump ${{ github.event.client_payload.match }} deps to ${{ github.event.client_payload.version }}"
-          title: "chore: bump ${{ github.event.client_payload.match }} deps to ${{ github.event.client_payload.version }}"
+          branch: chore/update-${{ env.MATCH }}-${{ env.VERSION }}
+          title: "chore: bump ${{ env.MATCH }}* dependencies to ${{ env.VERSION }}"
           body: |
-            This PR updates all dependencies containing **"${{ github.event.client_payload.match }}"**  
-            to version **${{ github.event.client_payload.version }}**.
-          labels: dependencies
+            This PR updates all **${{ env.MATCH }}**-related dependencies in the following files (with lockfiles):
+
+            ${{ env.FILES }}
