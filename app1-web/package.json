@@ -1,6 +1,8 @@
 {
-    "devDependencies": {
-        "@cdssnc/gcds-components": "^0.22.0",
-        "@cdssnc/gcds-utility": "^1.0.0"
-    }
+  "devDependencies": {
+    "@cdssnc/gcds-components": "0.22.1",
+    "@cdssnc/gcds-utility": "^1.0.0"
+  },
+  "dependencies": {},
+  "peerDependencies": {}
 }
