@@ -1,7 +1,9 @@
 {
-    "dependencies": {
-        "package-one": "0.3.0",
-        "package-one-vue": "0.3.0",
-        "package-two": "1.3.0"
-    }
+  "dependencies": {
+    "package-one": "0.4.5",
+    "package-one-vue": "0.4.5",
+    "package-two": "1.3.0"
+  },
+  "devDependencies": {},
+  "peerDependencies": {}
 }
