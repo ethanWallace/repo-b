@@ -1,7 +1,0 @@
-{
-    "dependencies": {
-        "package-one": "0.3.0",
-        "package-one-react": "0.3.0",
-        "package-two": "1.3.0"
-    }
-}
