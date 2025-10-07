@@ -38,6 +38,16 @@ jobs:
             fi
           done <<< "$FILES"
 
+      - name: Run npm install to update lockfiles
+        run: |
+          while IFS= read -r FILE; do
+            DIR=$(dirname "$FILE")
+            if [ -f "$FILE" ]; then
+              echo "Running npm install in $DIR ..."
+              (cd "$DIR" && npm install --package-lock-only)
+            fi
+          done <<< "$FILES"
+
       - name: Check if changes exist
         run: |
           if git diff --quiet; then
