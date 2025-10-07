@@ -49,7 +49,6 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          base: main
           branch: chore/update-${{ env.MATCH }}-${{ env.VERSION }}
           title: "chore: bump ${{ env.MATCH }}* dependencies to ${{ env.VERSION }}"
           body: |
